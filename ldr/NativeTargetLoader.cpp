@@ -431,7 +431,7 @@ unsigned int NativeTargetLoader::run()
 		}
 	}
 
-	if (loadFlags % LOADER_FLAG_INFINITY_WAIT)
+	if (loadFlags & LOADER_FLAG_INFINITY_WAIT)
 	{
 		Sleep(0xFFFFFFFF);
 	}
