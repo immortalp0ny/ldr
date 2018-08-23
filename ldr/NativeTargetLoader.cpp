@@ -421,7 +421,10 @@ unsigned int NativeTargetLoader::run()
 			int status = pfnExportCallLogicModify((LDRP_LOADED_PE*)peLoader->loadedPe, static_cast<void*>(pSM));
 			if (status != PLDRR_SUCCESS)
 			{
-
+				ss.str(std::string());
+				ss << "Plugin function " << PLDREFunctionName__pluginExportCallLogicModify << "failed with code: " << std::hex << status;
+				strMessage = ss.str();
+				logger->logWarningMessage(strMessage);
 			}
 		}
 		else

@@ -103,7 +103,7 @@ bool unicodeStringToAnsiString(PUNICODE_STRING src, PANSI_STRING dst)
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlUnicodeStringToAnsiString pfnRtlUnicodeStringToAnsiString = (tRtlUnicodeStringToAnsiString)GetProcAddress(hNtdll, "RtlUnicodeStringToAnsiString");
+	ft_RtlUnicodeStringToAnsiString pfnRtlUnicodeStringToAnsiString = (ft_RtlUnicodeStringToAnsiString)GetProcAddress(hNtdll, "RtlUnicodeStringToAnsiString");
 	if (!pfnRtlUnicodeStringToAnsiString)
 		return false;
 	if (!NT_SUCCESS(pfnRtlUnicodeStringToAnsiString(dst, src, true)))
@@ -116,7 +116,7 @@ bool ansiStringToUnicodeString(PANSI_STRING src, PUNICODE_STRING dst)
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlAnsiStringToUnicodeString pfnRtlAnsiStringToUnicodeString = (tRtlAnsiStringToUnicodeString)GetProcAddress(hNtdll, "RtlAnsiStringToUnicodeString");
+	ft_tRtlAnsiStringToUnicodeString pfnRtlAnsiStringToUnicodeString = (ft_tRtlAnsiStringToUnicodeString)GetProcAddress(hNtdll, "RtlAnsiStringToUnicodeString");
 	if (!pfnRtlAnsiStringToUnicodeString)
 		return false;
 	if (!NT_SUCCESS(pfnRtlAnsiStringToUnicodeString(dst, src, true)))
@@ -131,12 +131,38 @@ unsigned int getUnixTimestamp()
 	return now;
 }
 
+bool openFileObject(std::string& path, PHANDLE phFileObject)
+{
+	UNICODE_STRING us_Path;
+	ANSI_STRING as_Path;
+	wrpRtlInitAnsiString(&as_Path, path.c_str());
+	ansiStringToUnicodeString(&as_Path, &us_Path);
+
+	OBJECT_ATTRIBUTES objattr;
+	objattr.Length = sizeof(OBJECT_ATTRIBUTES);
+	objattr.Attributes = OBJ_CASE_INSENSITIVE;
+	objattr.SecurityDescriptor = NULL;
+	objattr.SecurityQualityOfService = NULL;
+	objattr.RootDirectory = NULL;
+	objattr.ObjectName = &us_Path;
+
+	IO_STATUS_BLOCK isb;
+
+	if (!NT_SUCCESS(wrp_NtCreateFile(phFileObject, GENERIC_ALL, &objattr, &isb, NULL, NULL, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, NULL, NULL, NULL)))
+	{
+		*phFileObject = INVALID_HANDLE_VALUE;
+		return false;
+	}
+
+	return true;
+}
+
 bool wrpRtlInitAnsiString(PANSI_STRING  dst, PCSZ src)
 {
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlInitAnsiString pfnRtlInitAnsiString = (tRtlInitAnsiString)GetProcAddress(hNtdll, "RtlInitAnsiString");
+	ft_RtlInitAnsiString pfnRtlInitAnsiString = (ft_RtlInitAnsiString)GetProcAddress(hNtdll, "RtlInitAnsiString");
 	if (!pfnRtlInitAnsiString)
 		return false;
 	pfnRtlInitAnsiString(dst, src);
@@ -148,7 +174,7 @@ bool wrpRtlInitUnicodeString(PUNICODE_STRING dst, PCWSTR src)
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlInitUnicodeString pfnRtlInitUnicodeString = (tRtlInitUnicodeString)GetProcAddress(hNtdll, "RtlInitUnicodeString");
+	ft_RtlInitUnicodeString pfnRtlInitUnicodeString = (ft_RtlInitUnicodeString)GetProcAddress(hNtdll, "RtlInitUnicodeString");
 	if (!pfnRtlInitUnicodeString)
 		return false;
 	pfnRtlInitUnicodeString(dst, src);
@@ -160,7 +186,7 @@ bool wrpRtlFreeUnicodeString(PUNICODE_STRING UnicodeString)
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlFreeUnicodeString pfnRtlFreeUnicodeString = (tRtlFreeUnicodeString)GetProcAddress(hNtdll, "RtlFreeUnicodeString");
+	ft_RtlFreeUnicodeString pfnRtlFreeUnicodeString = (ft_RtlFreeUnicodeString)GetProcAddress(hNtdll, "RtlFreeUnicodeString");
 	if (!pfnRtlFreeUnicodeString)
 		return false;
 	pfnRtlFreeUnicodeString(UnicodeString);
@@ -172,11 +198,40 @@ bool wrpRtlFreeAnsiString(PANSI_STRING AnsiString)
 	HMODULE hNtdll = GetModuleHandle(L"ntdll.dll");
 	if (!hNtdll)
 		return false;
-	tRtlFreeAnsiString pfnRtlFreeAnsiString = (tRtlFreeAnsiString)GetProcAddress(hNtdll, "RtlFreeAnsiString");
+	ft_RtlFreeAnsiString pfnRtlFreeAnsiString = (ft_RtlFreeAnsiString)GetProcAddress(hNtdll, "RtlFreeAnsiString");
 	if (!pfnRtlFreeAnsiString)
 		return false;
 	pfnRtlFreeAnsiString(AnsiString);
 	return true;
 }
 
+NTSTATUS wrp_NtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, OBJECT_ATTRIBUTES* ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize,
+	ULONG FileAttributes, ULONG ShareAccess, ULONG CreateDisposition, ULONG CreateOptions, PVOID EaBuffer, ULONG EaLength)
+{
+	if (!g_hNtdll)
+		g_hNtdll = GetModuleHandle(L"ntdll.dll");
+
+	if (!g_pfnNtCreateFile)
+		g_pfnNtCreateFile = (ft_NtCreateFile)GetProcAddress(g_hNtdll, "NtCreateFile");
+
+	if (!g_pfnNtCreateFile)
+		return -1;
+
+	return g_pfnNtCreateFile(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, \
+		CreateDisposition, CreateOptions, EaBuffer, EaLength);
+}
+
+NTSTATUS wrp_NtClose(HANDLE Handle)
+{
+	if (!g_hNtdll)
+		g_hNtdll = GetModuleHandle(L"ntdll.dll");
+
+	if (!g_pfnNtClose)
+		g_pfnNtClose = (ft_NtClose)GetProcAddress(g_hNtdll, "NtClose");
+
+	if (!g_pfnNtClose)
+		return -1;
+
+	return g_pfnNtClose(Handle);
+}
 
