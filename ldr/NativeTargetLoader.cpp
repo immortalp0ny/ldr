@@ -12,7 +12,6 @@ NativeTargetLoader::NativeTargetLoader(bool verbose)
 	peLoader = new PE();
 }
 
-
 NativeTargetLoader::~NativeTargetLoader()
 {
 	if (logger)
